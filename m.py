@@ -21,7 +21,7 @@ KEY_FILE = "keys.json"
 
 # Cooldown settings
 COOLDOWN_TIME = 0  # in seconds
-CONSECUTIVE_ATTACKS_LIMIT = 5
+CONSECUTIVE_ATTACKS_LIMIT = 20
 CONSECUTIVE_ATTACKS_COOLDOWN = 10  # in seconds
 
 # In-memory storage
@@ -186,8 +186,8 @@ def handle_bgmi(message):
             try:
                 port = int(command[2])
                 time = int(command[3])
-                if time > 300:
-                    response = "⚠️𝐄𝐑𝐑𝐎𝐑:280 𝐒𝐄 𝐓𝐇𝐎𝐃𝐀 𝐊𝐀𝐌 𝐓𝐈𝐌𝐄 𝐃𝐀𝐀𝐋 𝐆𝐀𝐍𝐃𝐔."
+                if time > 500:
+                    response = "⚠️𝐄𝐑𝐑𝐎𝐑:480 𝐒𝐄 𝐓𝐇𝐎𝐃𝐀 𝐊𝐀𝐌 𝐓𝐈𝐌𝐄 𝐃𝐀𝐀𝐋 𝐆𝐀𝐍𝐃𝐔."
                 else: 
                     record_command_logs(user_id, '/bgmi', target, port, time)
                     log_command(user_id, target, port, time)
@@ -326,7 +326,7 @@ def welcome_plan(message):
 VIP 🌟:
 -> Attack time: 180 seconds
 -> After attack limit: 5 minutes
--> Concurrent attacks: 3
+-> Concurrent attacks: 20
 
 𝐓𝐄𝐑𝐈 𝐀𝐔𝐊𝐀𝐃 𝐒𝐄 𝐁𝐀𝐇𝐀𝐑 💸:
 1𝐃𝐚𝐲: 200 𝐫𝐬
@@ -400,3 +400,56 @@ if __name__ == "__main__":
             print(e)
             # Add a small delay to avoid rapid looping in case of persistent errors
             time.sleep(15)
+
+MAX_RESTARTS = 10
+RESTART_PERIOD = 20  # Seconds
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+bot = Bot(API_TOKEN)
+
+def start_bot():
+    """Start the bot script as a subprocess."""
+    return subprocess.Popen(['python', 'm.py'])
+
+async def notify_admin(message):
+    """Send a notification message to the admin via Telegram."""
+    try:
+        await bot.send_message(ADMIN_ID, message)
+        logging.info("Admin notified: %s", message)
+    except Exception as e:
+        logging.error("Failed to send message to admin: %s", e)
+
+async def main():
+    """Main function to manage bot process lifecycle."""
+    restart_count = 0
+    last_restart_time = time.time()
+    
+    while True:
+        if restart_count >= MAX_RESTARTS:
+            current_time = time.time()
+            if current_time - last_restart_time < RESTART_PERIOD:
+                wait_time = RESTART_PERIOD - (current_time - last_restart_time)
+                logging.warning("Maximum restart limit reached. Waiting for %.2f seconds...", wait_time)
+                await notify_admin(f"⚠️ Maximum restart limit reached. Waiting for {int(wait_time)} seconds before retrying.")
+                await asyncio.sleep(wait_time)
+            restart_count = 0
+            last_restart_time = time.time()
+
+        logging.info("Starting the bot...")
+        process = start_bot()
+        await notify_admin("🚀 Bot is starting...")
+
+        while process.poll() is None:
+            await asyncio.sleep(5)
+        
+        logging.warning("Bot process terminated. Restarting in 10 seconds...")
+        await notify_admin("⚠️ The bot has crashed and will be restarted in 10 seconds.")
+        restart_count += 1
+        await asyncio.sleep(10)
+        
+
+if __name__ == '__main__':
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logging.info("Venom script terminated by user.")
